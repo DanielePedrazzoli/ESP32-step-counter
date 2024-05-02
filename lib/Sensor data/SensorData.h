@@ -11,29 +11,16 @@ public:
     SensorData();
     ~SensorData();
 
-    int16_t lastDataOf(AXES);
-    int16_t startFilteringAxes(AXES);
+    void init();
 
-    void initFilter();
-    int addValue(AXES, int16_t);
+    void computeMagnitude(int16_t, int16_t, int16_t);
 
     // Varibili par array circolare
-    int last_x_index = 0;
-    int last_y_index = 0;
-    int last_z_index = 0;
+    int last_mag_index = 0;
 
-    // // Filtered Value
-    // int16_t x_values_filtered[N_VALUE_PER_READING];
-    // int16_t y_values_filtered[N_VALUE_PER_READING];
-    // int16_t z_values_filtered[N_VALUE_PER_READING];
-    // Raw Value
-    int16_t x_values[SAMPLE_FILTER_TAP_NUM];
-    int16_t y_values[SAMPLE_FILTER_TAP_NUM];
-    int16_t z_values[SAMPLE_FILTER_TAP_NUM];
-
-    int16_t x_filtered_value;
-    int16_t y_filtered_value;
-    int16_t z_filtered_value;
+    double mag[SAMPLE_FILTER_TAP_NUM];
+    double mag_net[SAMPLE_FILTER_TAP_NUM];
+    double mag_avg;
 
 private:
     // Filter variable
@@ -46,4 +33,6 @@ private:
     int16_t delay[SAMPLE_FILTER_TAP_NUM];
     uint16_t lastIndex;
     uint16_t history[SAMPLE_FILTER_TAP_NUM];
+
+    void computeAverage();
 };

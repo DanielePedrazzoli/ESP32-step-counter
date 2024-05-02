@@ -78,32 +78,29 @@ void splitData(uint8_t *buffer, uint16_t start, int16_t value)
 
 void BLE_Manager::changeValue_Accelerometer_value(SensorData *sensorData)
 {
-    int16_t value_x = sensorData->x_filtered_value;
-    int16_t value_y = sensorData->z_values[sensorData->last_z_index];
-    int16_t value_z = sensorData->z_filtered_value;
+    int16_t mag = (int16_t)sensorData->mag;
+    int16_t net_mag = (int16_t)sensorData->mag_net;
     uint8_t data[6];
-    data[0] = value_x >> 8;
-    data[1] = value_x & 0xFF;
-    data[2] = value_y >> 8;
-    data[3] = value_y & 0xFF;
-    data[4] = value_z >> 8;
-    data[5] = value_z & 0xFF;
+    data[0] = mag >> 8;
+    data[1] = mag & 0xFF;
+    data[2] = net_mag >> 8;
+    data[3] = net_mag & 0xFF;
     pAccelerometerData->setValue(data, sizeof(data));
     pAccelerometerData->indicate();
 }
 
-void BLE_Manager::changeValue_Gyroscope_value(SensorData *sensorData)
-{
-    int16_t value_x = sensorData->lastDataOf(AXES::X);
-    uint16_t value_y = sensorData->lastDataOf(AXES::Y);
-    uint16_t value_z = sensorData->lastDataOf(AXES::Z);
-    uint8_t data[6];
-    data[0] = value_x >> 8;
-    data[1] = value_x & 0xFF;
-    data[2] = value_y >> 8;
-    data[3] = value_y & 0xFF;
-    data[4] = value_z >> 8;
-    data[5] = value_z & 0xFF;
-    pGyroscopeData->setValue(data, sizeof(data));
-    pGyroscopeData->indicate();
-}
+// void BLE_Manager::changeValue_Gyroscope_value(SensorData *sensorData)
+// {
+//     int16_t value_x = sensorData->lastDataOf(AXES::X);
+//     uint16_t value_y = sensorData->lastDataOf(AXES::Y);
+//     uint16_t value_z = sensorData->lastDataOf(AXES::Z);
+//     uint8_t data[6];
+//     data[0] = value_x >> 8;
+//     data[1] = value_x & 0xFF;
+//     data[2] = value_y >> 8;
+//     data[3] = value_y & 0xFF;
+//     data[4] = value_z >> 8;
+//     data[5] = value_z & 0xFF;
+//     pGyroscopeData->setValue(data, sizeof(data));
+//     pGyroscopeData->indicate();
+// }

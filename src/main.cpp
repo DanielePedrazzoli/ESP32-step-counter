@@ -35,7 +35,7 @@ void setup()
   pinMode(AD0_SENSOR, INPUT); // tristate
   digitalWrite(VCC_SENSOR, HIGH);
 
-  accelerometerData.initFilter();
+  accelerometerData.init();
   // gyroscopeData.initFilter();
 
   Serial.begin(115200);
@@ -80,17 +80,11 @@ void loop()
 
     I2Cdev::readBytes(SENSOR_ADDRESS, 0x3B, 14, buffer);
 
-    accelerometerData.addValue(AXES::X, ((int16_t)buffer[0] << 8) | buffer[1]);
-    accelerometerData.addValue(AXES::Y, ((int16_t)buffer[2] << 8) | buffer[3]);
-    accelerometerData.addValue(AXES::Z, ((int16_t)buffer[4] << 8) | buffer[5]);
+    accelerometerData.computeMagnitude(((int16_t)buffer[0] << 8) | buffer[1], ((int16_t)buffer[2] << 8) | buffer[3], ((int16_t)buffer[4] << 8) | buffer[5]);
 
     // gyroscopeData.addValue(AXES::X, ((int16_t)buffer[8] << 8) | buffer[9]);
     // gyroscopeData.addValue(AXES::Y, ((int16_t)buffer[10] << 8) | buffer[11]);
     // gyroscopeData.addValue(AXES::Z, ((int16_t)buffer[12] << 8) | buffer[13]);
-
-    accelerometerData.startFilteringAxes(AXES::X);
-    accelerometerData.startFilteringAxes(AXES::Y);
-    accelerometerData.startFilteringAxes(AXES::Z);
 
     bleManager.changeValue_Accelerometer_value(&accelerometerData);
   }
