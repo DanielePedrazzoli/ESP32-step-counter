@@ -2,14 +2,10 @@
 #include "Costants.h"
 
 // Implementazione del costruttore
-SensorData::SensorData()
-{
-}
+SensorData::SensorData() {}
 
 // Implementazione del distruttore
-SensorData::~SensorData()
-{
-}
+SensorData::~SensorData() {}
 
 int16_t SensorData::lastDataOf(AXES axes)
 {
