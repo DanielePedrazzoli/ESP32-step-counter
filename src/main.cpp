@@ -88,4 +88,6 @@ void loop()
 
     bleManager.changeValue_Accelerometer_value(&accelerometerData);
   }
+
+  delay(100);
 }

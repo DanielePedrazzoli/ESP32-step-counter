@@ -20,8 +20,6 @@ void SensorData::init()
         mag[i] = 0;
         mag_net[i] = 0;
     }
-
-    dsps_fir_init_s16(filterStructure, ACC_FILTER_TAPS, delay, SAMPLE_FILTER_TAP_NUM,0, 0, 0,  );
 }
 
 /**
@@ -45,6 +43,7 @@ void SensorData::computeMagnitude(int16_t x, int16_t y, int16_t z)
     {
         last_mag_index = 0;
     }
+    applyFilter();
 }
 
 /**
@@ -59,6 +58,28 @@ void SensorData::computeAverage()
         temp += mag[i];
     }
     mag_avg = temp / SAMPLE_FILTER_TAP_NUM;
+}
+
+float SensorData::getLastAvaiableData()
+{
+    return mag[last_mag_index];
+}
+
+float SensorData::getLastAvaiableData_net()
+{
+    return mag_net[last_mag_index];
+}
+
+void SensorData::applyFilter()
+{
+    double acc = 0;
+    int index = last_mag_index;
+    for (int i = 0; i < SAMPLE_FILTER_TAP_NUM; ++i)
+    {
+        index = index != 0 ? index - 1 : SAMPLE_FILTER_TAP_NUM - 1;
+        acc += (long long)mag_net[index] * FILTER_TAPS[i];
+    };
+    filtred_value = acc;
 }
 
 // int16_t SensorData::startFilteringAxes(AXES axes)

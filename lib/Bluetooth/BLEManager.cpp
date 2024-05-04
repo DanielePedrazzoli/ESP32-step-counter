@@ -78,14 +78,15 @@ void splitData(uint8_t *buffer, uint16_t start, int16_t value)
 
 void BLE_Manager::changeValue_Accelerometer_value(SensorData *sensorData)
 {
-    int16_t mag = (int16_t)sensorData->mag;
-    int16_t net_mag = (int16_t)sensorData->mag_net;
-    uint8_t data[6];
-    data[0] = mag >> 8;
-    data[1] = mag & 0xFF;
-    data[2] = net_mag >> 8;
-    data[3] = net_mag & 0xFF;
-    pAccelerometerData->setValue(data, sizeof(data));
+    float mag = sensorData->getLastAvaiableData();
+    // int32_t net_mag = (int32_t)sensorData->getLastAvaiableData_net();
+
+    float2bytes data;
+    data.f = sensorData->filtred_value;
+
+    pAccelerometerData->setValue(data.b, sizeof(data));
+
+    // pAccelerometerData->setValue((float)5);
     pAccelerometerData->indicate();
 }
 
