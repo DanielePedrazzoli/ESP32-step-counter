@@ -33,8 +33,9 @@ THE SOFTWARE.
 #ifndef _MPU6050_9AXIS_MOTIONAPPS41_H_
 #define _MPU6050_9AXIS_MOTIONAPPS41_H_
 
-#include "I2Cdev/I2Cdev.h"
+#include <I2Cdev.h>
 #include "helper_3dmath.h"
+#include "string.h"
 
 // MotionApps 4.1 DMP implementation, built using the MPU-9150 "MotionFit" board
 #define MPU6050_INCLUDE_DMP_MOTIONAPPS41
@@ -337,7 +338,7 @@ uint8_t MPU6050::dmpInitialize()
     // reset device
     DEBUG_PRINTLN(F("\n\nResetting MPU6050..."));
     reset();
-    delay(30); // wait after reset
+    // delay(30); // wait after reset
 
     // disable sleep mode
     DEBUG_PRINTLN(F("Disabling sleep mode..."));

@@ -33,7 +33,7 @@ THE SOFTWARE.
 #ifndef _MPU6050_6AXIS_MOTIONAPPS20_H_
 #define _MPU6050_6AXIS_MOTIONAPPS20_H_
 
-#include "I2Cdev/I2Cdev.h"
+#include <I2Cdev.h>
 // #include "helper_3dmath.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -2430,32 +2430,8 @@ uint8_t MPU6050::dmpGetQuaternion(int32_t *data, const uint8_t *packet)
     data[3] = (((uint32_t)packet[12] << 24) | ((uint32_t)packet[13] << 16) | ((uint32_t)packet[14] << 8) | packet[15]);
     return 0;
 }
-uint8_t MPU6050::dmpGetQuaternion(int16_t *data, const uint8_t *packet)
-{
-    // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0)
-        packet = dmpPacketBuffer;
-    data[0] = ((packet[0] << 8) | packet[1]);
-    data[1] = ((packet[4] << 8) | packet[5]);
-    data[2] = ((packet[8] << 8) | packet[9]);
-    data[3] = ((packet[12] << 8) | packet[13]);
-    return 0;
-}
-uint8_t MPU6050::dmpGetQuaternion(Quaternion *q, const uint8_t *packet)
-{
-    // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    int16_t qI[4];
-    uint8_t status = dmpGetQuaternion(qI, packet);
-    if (status == 0)
-    {
-        q->w = (float)qI[0] / 16384.0f;
-        q->x = (float)qI[1] / 16384.0f;
-        q->y = (float)qI[2] / 16384.0f;
-        q->z = (float)qI[3] / 16384.0f;
-        return 0;
-    }
-    return status; // int16 return value, indicates error if this line is reached
-}
+uint8_t MPU6050::dmpGetQuaternion(int16_t *data, const uint8_t *packet);
+uint8_t MPU6050::dmpGetQuaternion(Quaternion *q, const uint8_t *packet);
 // uint8_t MPU6050::dmpGet6AxisQuaternion(long *data, const uint8_t* packet);
 // uint8_t MPU6050::dmpGetRelativeQuaternion(long *data, const uint8_t* packet);
 uint8_t MPU6050::dmpGetGyro(int32_t *data, const uint8_t *packet)

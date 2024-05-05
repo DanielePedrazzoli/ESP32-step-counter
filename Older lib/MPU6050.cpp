@@ -3700,3 +3700,40 @@ void MPU6050::PID(uint8_t ReadAddress, float kP, float kI, uint8_t Loops)
     resetFIFO();
     resetDMP();
 }
+uint8_t MPU6050::dmpGetQuaternion(int32_t *data, const uint8_t *packet)
+{
+    // TODO: accommodate different arrangements of sent data (ONLY default supported now)
+    if (packet == 0)
+        packet = dmpPacketBuffer;
+    data[0] = (((uint32_t)packet[0] << 24) | ((uint32_t)packet[1] << 16) | ((uint32_t)packet[2] << 8) | packet[3]);
+    data[1] = (((uint32_t)packet[4] << 24) | ((uint32_t)packet[5] << 16) | ((uint32_t)packet[6] << 8) | packet[7]);
+    data[2] = (((uint32_t)packet[8] << 24) | ((uint32_t)packet[9] << 16) | ((uint32_t)packet[10] << 8) | packet[11]);
+    data[3] = (((uint32_t)packet[12] << 24) | ((uint32_t)packet[13] << 16) | ((uint32_t)packet[14] << 8) | packet[15]);
+    return 0;
+}
+uint8_t MPU6050::dmpGetQuaternion(int16_t *data, const uint8_t *packet)
+{
+    // TODO: accommodate different arrangements of sent data (ONLY default supported now)
+    if (packet == 0)
+        packet = dmpPacketBuffer;
+    data[0] = ((packet[0] << 8) | packet[1]);
+    data[1] = ((packet[4] << 8) | packet[5]);
+    data[2] = ((packet[8] << 8) | packet[9]);
+    data[3] = ((packet[12] << 8) | packet[13]);
+    return 0;
+}
+uint8_t MPU6050::dmpGetQuaternion(Quaternion *q, const uint8_t *packet)
+{
+    // TODO: accommodate different arrangements of sent data (ONLY default supported now)
+    int16_t qI[4];
+    uint8_t status = dmpGetQuaternion(qI, packet);
+    if (status == 0)
+    {
+        q->w = (float)qI[0] / 16384.0f;
+        q->x = (float)qI[1] / 16384.0f;
+        q->y = (float)qI[2] / 16384.0f;
+        q->z = (float)qI[3] / 16384.0f;
+        return 0;
+    }
+    return status; // int16 return value, indicates error if this line is reached
+}
