@@ -12,7 +12,7 @@ void CalibrationManager::startCalibration()
 {
     if (state == 0)
     {
-        Serial.println("\nReading sensors for first time...");
+        Serial.println(F("\nReading sensors for first time..."));
         this->meansensors();
         state++;
         delay(1000);
@@ -20,7 +20,7 @@ void CalibrationManager::startCalibration()
 
     if (state == 1)
     {
-        Serial.println("\nCalculating offsets...");
+        Serial.println(F("\nCalculating offsets..."));
         this->calibration();
         state++;
         delay(1000);
@@ -29,8 +29,8 @@ void CalibrationManager::startCalibration()
     if (state == 2)
     {
         this->meansensors();
-        Serial.println("\nFINISHED!");
-        Serial.print("\nSensor readings with offsets:\t");
+        Serial.println(F("\nFINISHED!"));
+        Serial.print(F("\nSensor readings with offsets:\t"));
         Serial.print(mean_ax);
         Serial.print("\t");
         Serial.print(mean_ay);
@@ -42,7 +42,7 @@ void CalibrationManager::startCalibration()
         Serial.print(mean_gy);
         Serial.print("\t");
         Serial.println(mean_gz);
-        Serial.print("Your offsets:\t");
+        Serial.print(F("Your offsets:\t"));
         Serial.print(ax_offset);
         Serial.print("\t");
         Serial.print(ay_offset);
@@ -66,13 +66,13 @@ void CalibrationManager::startCalibration()
         sensorSettings->putInt("gryo_z_offset", gz_offset);
         sensorSettings->putBool("calDataReady", true);
 
-        Serial.println("Saving data locally\n Restart the device");
+        Serial.println(F("Saving data locally"));
     }
 }
 
 void CalibrationManager::importCalibrationData()
 {
-    Serial.println("Reading data from last calibration session");
+    Serial.println(F("Reading data from last calibration session"));
     sensorSettings->begin("myPrefs", false);
     bool doesExist = sensorSettings->isKey("calDataReady");
     if (doesExist)
@@ -83,8 +83,8 @@ void CalibrationManager::importCalibrationData()
         gyroX_offest = sensorSettings->getInt("gyro_x_offset");
         gyroY_offest = sensorSettings->getInt("gyro_y_offset");
         gyroZ_offest = sensorSettings->getInt("gryo_z_offset");
-        Serial.println("Calibration data imported correctly");
-
+        isAlreadyCalibrated = true;
+        Serial.println(F("Calibration data imported correctly"));
         Serial.print("Your offsets:\t");
         Serial.print(accX_offest);
         Serial.print("\t");
@@ -100,13 +100,25 @@ void CalibrationManager::importCalibrationData()
     }
     else
     {
-        Serial.println("No calibration data avaiable. Reccomended run a new calibration session");
+        Serial.println(F("No calibration data avaiable. Reccomended run a new calibration session"));
         accX_offest = 0;
         accY_offest = 0;
         accZ_offest = 0;
         gyroX_offest = 0;
         gyroY_offest = 0;
         gyroZ_offest = 0;
+        isAlreadyCalibrated = false;
+    }
+    int calibrationCode = needCalibration();
+    if (calibrationCode)
+    {
+        Serial.print(F("Sensor calibration started cause: "));
+        Serial.println(calibrationCode == 1 ? F("from GPIO high") : F("no aother calibration has been founded first calibration"));
+        startCalibration();
+        Serial.println(F("Sensor calibration ended.\nRestarting device"));
+        delay(2000);
+        esp_restart();
+        return;
     }
 
     setCalibration();
@@ -210,4 +222,19 @@ void CalibrationManager::calibration()
         if (ready == 6)
             break;
     }
+}
+
+int CalibrationManager::needCalibration()
+{
+    if (digitalRead(25))
+    {
+        return 1;
+    }
+
+    if (!isAlreadyCalibrated)
+    {
+        return 2;
+    }
+
+    return 0;
 }

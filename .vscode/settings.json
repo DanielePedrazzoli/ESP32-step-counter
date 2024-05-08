@@ -22,6 +22,7 @@
         "iterator": "cpp",
         "unordered_map": "cpp",
         "unordered_set": "cpp",
-        "initializer_list": "cpp"
+        "initializer_list": "cpp",
+        "new": "cpp"
     }
 }

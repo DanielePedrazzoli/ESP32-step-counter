@@ -1,3 +1,6 @@
+## Versione 0.4.0
+- Sperimentati migliori filtri per il segnale
+
 ## Versione 0.3.0
 - Aggiornate le librerie di I2C e MPU
 - Aggiunto il supporto per l'autocalibrazione dei sensori

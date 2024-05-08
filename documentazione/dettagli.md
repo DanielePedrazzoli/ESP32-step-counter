@@ -73,3 +73,22 @@ Per individuare i passi viene usato questo algoritmo che si divide in 2 parti:
 - Di tutte le finestre salvate osservo se esiste una intersezione. In questo caso significa che è stato rilevato un picco (e quindi un passo) in un lasso di tempo estremamente stretto quindi probabilmente è un falso picco.
 
 Contare il numero di passi è a questo punto molto semplice, infatti è sufficente contare il numero di finestre rilevate che non si intersecano tra di loro. Nel caso 2 o più fiestre di intersechino tra di loro allora viene contato soltatno come 1 passo
+
+---
+
+## Motion sensing
+Il sesning del movimento viene effettuato tramite i passi ottenuti.
+Ogni volta che viene rilevato un passo viene preso il tempo tramite la millis() e calcolata la media di tempo assieme agli ultimi passi (per iniziare si tiene una storia di 5 passi).
+
+$$
+    avgStepPeriod = \frac{\sum_{i=0}^5 stepsTimes[i]}{5}
+$$
+
+Poi, calcolando l'inverso di questo valore si può ottenere la frequenza dei passi
+
+$$
+    freqStep = \frac{1}{avgStepPeriod}
+$$
+
+Questa frequenza verrà poi passata in un contorllo a soglia per determinare lo stato attuale.
+

@@ -15,31 +15,31 @@ void SensorData::init()
 
     mag_avg = 0;
     int i;
-    for (i = 0; i < SAMPLE_FILTER_TAP_NUM; ++i)
+    for (i = 0; i < MAX_SAMPLE_NUMBER; ++i)
     {
         mag[i] = 0;
         mag_net[i] = 0;
     }
+
+    kalmanFilter = new SimpleKalmanFilter(500, 1000, 0.01);
 }
 
 /**
  * @brief Effettua un calcolo del modulo e aggiorna in automatico il valore di media
  *
- * @param x valore asse x
- * @param y valore asse y
- * @param z valore asse z
+ * @param accelVector
  */
-void SensorData::computeMagnitude(int16_t x, int16_t y, int16_t z)
+void SensorData::computeMagnitude(VectorInt16 *accelVector)
 {
-    double magValue = sqrt(x * x + y * y + z * z);
+    double magValue = accelVector->getMagnitude();
 
-    mag[last_mag_index] = magValue;
-    computeAverage();
-    mag_net[last_mag_index] = magValue - mag_avg;
+    mag_net[last_mag_index] = magValue;
+    // computeAverage();
+    // mag_net[last_mag_index] = magValue - mag_avg;
 
     // incremento indice e controllo per la gestione del buffer circolare
     last_mag_index++;
-    if (last_mag_index >= SAMPLE_FILTER_TAP_NUM)
+    if (last_mag_index >= MAX_SAMPLE_NUMBER)
     {
         last_mag_index = 0;
     }
@@ -52,12 +52,13 @@ void SensorData::computeMagnitude(int16_t x, int16_t y, int16_t z)
  */
 void SensorData::computeAverage()
 {
-    double temp = 0;
-    for (uint8_t i = 0; i < SAMPLE_FILTER_TAP_NUM; i++)
+
+    double sum = 0;
+    for (uint8_t i = 0; i < MAX_SAMPLE_NUMBER; i++)
     {
-        temp += mag[i];
+        sum += mag[i];
     }
-    mag_avg = temp / SAMPLE_FILTER_TAP_NUM;
+    mag_avg = sum / MAX_SAMPLE_NUMBER;
 }
 
 float SensorData::getLastAvaiableData()
@@ -72,14 +73,17 @@ float SensorData::getLastAvaiableData_net()
 
 void SensorData::applyFilter()
 {
-    double acc = 0;
-    int index = last_mag_index;
-    for (int i = 0; i < SAMPLE_FILTER_TAP_NUM; ++i)
-    {
-        index = index != 0 ? index - 1 : SAMPLE_FILTER_TAP_NUM - 1;
-        acc += (long long)mag_net[index] * FILTER_TAPS[i];
-    };
-    filtred_value = acc;
+    // filtred_value = mag_net[last_mag_index];
+    // double acc = 0;
+    // int index = last_mag_index;
+    // for (int i = 0; i < SAMPLE_FILTER_TAP_NUM; ++i)
+    // {
+    //     index = index != 0 ? index - 1 : SAMPLE_FILTER_TAP_NUM - 1;
+    //     acc += (long long)mag_net[index] * FILTER_TAPS[i];
+    // };
+    // filtred_value = acc;
+
+    filtred_value = kalmanFilter->updateEstimate(mag_net[last_mag_index]);
 }
 
 // int16_t SensorData::startFilteringAxes(AXES axes)
