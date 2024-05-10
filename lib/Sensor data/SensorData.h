@@ -1,18 +1,14 @@
-#pragma once
+#ifndef _SENSOR_DATA_
+#define _SENSOR_DATA_
 
-#ifndef _MPU6050_6AXIS_MOTIONAPPS612_H_
 #include <MPU6050_6Axis_MotionApps612.h>
-#endif
-
-#define MAX_SAMPLE_NUMBER 100
-
 #include <Arduino.h>
-#include <dsps_fir.h>
-
 #include "Costants.h"
+#include "SampleFilter.h"
 #include "esp_dsp.h"
-#include "ekf_imu13states.h"
-#include "kalmanFilter.h"
+#include "SampleFilter.h"
+
+#define MAX_VALUE_NUMBER SAMPLEFILTER_TAP_NUM
 
 class SensorData
 {
@@ -21,33 +17,25 @@ public:
     ~SensorData();
 
     void init();
-
-    void computeMagnitude(int16_t, int16_t, int16_t);
-    void computeMagnitude(VectorInt16 *);
-
+    bool addValue(VectorInt16 *);
     float getLastAvaiableData();
-    float getLastAvaiableData_net();
 
-    // Varibili par array circolare
-    int last_mag_index = 0;
-
-    float mag[MAX_SAMPLE_NUMBER];
-    float mag_net[MAX_SAMPLE_NUMBER];
-    float mag_avg;
-    float filtred_value;
-    SimpleKalmanFilter *kalmanFilter;
+    int last_value_index = 0;
+    float values[SAMPLEFILTER_TAP_NUM];
 
 private:
-    // Filter variable
-    // Dato che tutti i valori di questa classe arrivano dallo stesso sensore
-    // (indipendentemente che esso sia l'acelerometro o il giroscopio)
-    // allora dovranno essere soggetti allo stesso filtro
-    // Ha senso quindi definire la variabile di filtraggio come interna
-    // per ridurre il codice esterno
-    fir_s16_t filterStructure;
-    int16_t delay[MAX_SAMPLE_NUMBER];
-    uint16_t history[MAX_SAMPLE_NUMBER];
+    bool computevalue();
 
-    void computeAverage();
-    void applyFilter();
+    // SimpleKalmanFilter *kalmanFilter;
+
+    SampleFilter filterStruct;
+
+    bool isAscending = false;
+    bool alreadyOverTreshold = false;
+
+    int threshold = 6553;
+    unsigned long lastUnderThreshold;
+    int samplesFomrLastStep = 0;
 };
+
+#endif

@@ -1,3 +1,8 @@
+## Versione 0.5.0
+- Eliminato l'uso del filtro kalman e rispistinato l'uso di un FIR passa basso
+- Aggiunto il conteggio dei passi in base alle soglie
+- Aggiornata la documentazione
+
 ## Versione 0.4.0
 - Sperimentati migliori filtri per il segnale
 

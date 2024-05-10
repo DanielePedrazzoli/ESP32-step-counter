@@ -1,5 +1,4 @@
 #include "sensorData.h"
-#include "Costants.h"
 
 // Implementazione del costruttore
 SensorData::SensorData() {}
@@ -12,121 +11,70 @@ SensorData::~SensorData() {}
  */
 void SensorData::init()
 {
+    // kalmanFilter = new SimpleKalmanFilter(500, 1000, 0.01);
 
-    mag_avg = 0;
-    int i;
-    for (i = 0; i < MAX_SAMPLE_NUMBER; ++i)
-    {
-        mag[i] = 0;
-        mag_net[i] = 0;
-    }
-
-    kalmanFilter = new SimpleKalmanFilter(500, 1000, 0.01);
+    // int i;
+    // for (i = 0; i < SAMPLEFILTER_TAP_NUM; ++i)
+    // {
+    //     filterStruct.history[i] = 0;
+    // }
+    // filterStruct.last_index = 0;
+    SampleFilter_init(&filterStruct);
 }
 
 /**
  * @brief Effettua un calcolo del modulo e aggiorna in automatico il valore di media
  *
- * @param accelVector
+ * @param v vettore di accelerazione
  */
-void SensorData::computeMagnitude(VectorInt16 *accelVector)
+bool SensorData::addValue(VectorInt16 *v)
 {
-    double magValue = accelVector->getMagnitude();
+    double magValue = v->getMagnitude();
 
-    mag_net[last_mag_index] = magValue;
-    // computeAverage();
-    // mag_net[last_mag_index] = magValue - mag_avg;
-
-    // incremento indice e controllo per la gestione del buffer circolare
-    last_mag_index++;
-    if (last_mag_index >= MAX_SAMPLE_NUMBER)
+    SampleFilter_put(&filterStruct, magValue);
+    values[last_value_index++] = SampleFilter_get(&filterStruct);
+    if (last_value_index >= MAX_VALUE_NUMBER)
     {
-        last_mag_index = 0;
+        last_value_index = 0;
     }
-    applyFilter();
-}
 
-/**
- * @brief Esegue una nuova computazione della media dei valori con quelli attualmente presenti dentro l'array `mag`
- *
- */
-void SensorData::computeAverage()
-{
+    // return false;
 
-    double sum = 0;
-    for (uint8_t i = 0; i < MAX_SAMPLE_NUMBER; i++)
-    {
-        sum += mag[i];
-    }
-    mag_avg = sum / MAX_SAMPLE_NUMBER;
+    return computevalue();
 }
 
 float SensorData::getLastAvaiableData()
 {
-    return mag[last_mag_index];
+    return values[last_value_index];
 }
 
-float SensorData::getLastAvaiableData_net()
+bool SensorData::computevalue()
 {
-    return mag_net[last_mag_index];
+    int secondToLast;
+    int last;
+    int current = values[last_value_index];
+    samplesFomrLastStep++;
+
+    if (!alreadyOverTreshold && current > threshold)
+    {
+        alreadyOverTreshold = true;
+
+        // controllo se sono stato al di sotto della threshold per un quantitativo
+        // di tempo ragionevole
+        // Questo permette di eliminare alcuni falsi passi che verrebbero rilevati
+        if (samplesFomrLastStep >= 70)
+        {
+            samplesFomrLastStep = 0;
+            return true;
+        }
+        return false;
+    }
+
+    if (alreadyOverTreshold && current < threshold)
+    {
+        samplesFomrLastStep = 0;
+        alreadyOverTreshold = false;
+    }
+
+    return false;
 }
-
-void SensorData::applyFilter()
-{
-    // filtred_value = mag_net[last_mag_index];
-    // double acc = 0;
-    // int index = last_mag_index;
-    // for (int i = 0; i < SAMPLE_FILTER_TAP_NUM; ++i)
-    // {
-    //     index = index != 0 ? index - 1 : SAMPLE_FILTER_TAP_NUM - 1;
-    //     acc += (long long)mag_net[index] * FILTER_TAPS[i];
-    // };
-    // filtred_value = acc;
-
-    filtred_value = kalmanFilter->updateEstimate(mag_net[last_mag_index]);
-}
-
-// int16_t SensorData::startFilteringAxes(AXES axes)
-// {
-
-//     int16_t *pointer;
-//     switch (axes)
-//     {
-//     case AXES::X:
-//         pointer = x_values;
-//         break;
-
-//     case AXES::Y:
-//         pointer = y_values;
-//         break;
-
-//     case AXES::Z:
-//         pointer = z_values;
-//         break;
-//     }
-
-//     int32_t acc = 0;
-//     int index = lastIndex, i;
-//     for (i = 0; i < SAMPLE_FILTER_TAP_NUM; ++i)
-//     {
-//         index = index != 0 ? index - 1 : SAMPLE_FILTER_TAP_NUM - 1;
-//         acc += (long long)pointer[index] * ACC_FILTER_TAPS[i];
-//     };
-
-//     switch (axes)
-//     {
-//     case AXES::X:
-//         x_filtered_value = (int16_t)(acc >> 16);
-//         break;
-
-//     case AXES::Y:
-//         y_filtered_value = (int16_t)(acc >> 16);
-//         break;
-
-//     case AXES::Z:
-//         z_filtered_value = (int16_t)(acc >> 16);
-//         break;
-//     }
-
-//     return 0;
-// }
