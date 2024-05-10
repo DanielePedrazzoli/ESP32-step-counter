@@ -1,3 +1,6 @@
+## Versione 0.5.2
+- Bugfix
+
 ## Versione 0.5.1
 - Aggiunta la documentazione alle funzioni e ai metodi
 

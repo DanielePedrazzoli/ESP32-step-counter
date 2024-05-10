@@ -88,8 +88,3 @@ void BLE_Manager::changeValue_Accelerometer_value(SensorData *sensorData)
  * @brief Union che permette di spezzare un dato float in un array di byte
  * Questa union viene usata nell'invio dei dati dell'accelerometro tramite BLE
  */
-union float2bytes
-{
-    float f;
-    uint8_t b[sizeof(float)];
-};

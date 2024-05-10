@@ -4,6 +4,12 @@
 #include <NimBLEDevice.h>
 #include "SensorData.h"
 
+union float2bytes
+{
+    float f;
+    uint8_t b[sizeof(float)];
+};
+
 class BLE_Manager
 {
 public:

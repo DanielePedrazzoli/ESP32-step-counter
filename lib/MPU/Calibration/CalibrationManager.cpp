@@ -22,7 +22,7 @@ void CalibrationManager::startCalibration()
 {
     if (state == 0)
     {
-        Serial.println(F("\Leggendo i valori dei sensori ..."));
+        Serial.println(F("\nLeggendo i valori dei sensori ..."));
         this->meansensors();
         state++;
         delay(1000);
@@ -30,7 +30,7 @@ void CalibrationManager::startCalibration()
 
     if (state == 1)
     {
-        Serial.println(F("\Calcolo gli offset..."));
+        Serial.println(F("\nCalcolo gli offset..."));
         this->calibration();
         state++;
         delay(1000);
@@ -39,7 +39,7 @@ void CalibrationManager::startCalibration()
     if (state == 2)
     {
         this->meansensors();
-        Serial.println(F("\nFINISHED!"));
+        Serial.println(F("\nTERMINATO"));
         Serial.print(F("\nLettura dei sensori con gli offset:\t"));
         Serial.print(mean_ax);
         Serial.print("\t");
