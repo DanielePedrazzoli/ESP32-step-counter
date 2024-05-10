@@ -2,17 +2,27 @@
 #include "CalibrationManager.h"
 #include <Arduino.h>
 
+/**
+ * brief Costruttore base della classe
+ *
+ * @param sensorPointer puntatore alla classe che comunica con il sensore
+ * @param preferencesPointer puntatore alle preference usate nel progetto
+ */
 CalibrationManager::CalibrationManager(MPU6050 *sensorPointer, Preferences *preferencesPointer)
 {
     accelgyro = sensorPointer;
     sensorSettings = preferencesPointer;
 }
 
+/**
+ * @brief Inizia la fase di calibrazione dei sensori. Questa funzione poterbbe richiedere fino a 1 minuto
+ *
+ */
 void CalibrationManager::startCalibration()
 {
     if (state == 0)
     {
-        Serial.println(F("\nReading sensors for first time..."));
+        Serial.println(F("\Leggendo i valori dei sensori ..."));
         this->meansensors();
         state++;
         delay(1000);
@@ -20,7 +30,7 @@ void CalibrationManager::startCalibration()
 
     if (state == 1)
     {
-        Serial.println(F("\nCalculating offsets..."));
+        Serial.println(F("\Calcolo gli offset..."));
         this->calibration();
         state++;
         delay(1000);
@@ -30,7 +40,7 @@ void CalibrationManager::startCalibration()
     {
         this->meansensors();
         Serial.println(F("\nFINISHED!"));
-        Serial.print(F("\nSensor readings with offsets:\t"));
+        Serial.print(F("\nLettura dei sensori con gli offset:\t"));
         Serial.print(mean_ax);
         Serial.print("\t");
         Serial.print(mean_ay);
@@ -42,7 +52,7 @@ void CalibrationManager::startCalibration()
         Serial.print(mean_gy);
         Serial.print("\t");
         Serial.println(mean_gz);
-        Serial.print(F("Your offsets:\t"));
+        Serial.print(F("Gli offset dei sensori:\t"));
         Serial.print(ax_offset);
         Serial.print("\t");
         Serial.print(ay_offset);
@@ -54,9 +64,6 @@ void CalibrationManager::startCalibration()
         Serial.print(gy_offset);
         Serial.print("\t");
         Serial.println(gz_offset);
-        // Serial.println("\nData is printed as: acelX acelY acelZ giroX giroY giroZ");
-        // Serial.println("Check that your sensor readings are close to 0 0 16384 0 0 0");
-        // Serial.println("If calibration was succesful write down your offsets so you can set them in your projects using something similar to mpu.setXAccelOffset(youroffset)");
 
         sensorSettings->putInt("acc_x_offset", ax_offset);
         sensorSettings->putInt("acc_y_offset", ay_offset);
@@ -66,13 +73,18 @@ void CalibrationManager::startCalibration()
         sensorSettings->putInt("gryo_z_offset", gz_offset);
         sensorSettings->putBool("calDataReady", true);
 
-        Serial.println(F("Saving data locally"));
+        Serial.println(F("Dati salvati in memoria e disponibili per la prossima lettura"));
     }
 }
 
+/**
+ * @brief Esegue l'importazione dei valori si offset caricati in memoria
+ * Se non trovati oppure se il pin predisposto è alto allora inizia in automatico la fase di calibrazione
+ *
+ */
 void CalibrationManager::importCalibrationData()
 {
-    Serial.println(F("Reading data from last calibration session"));
+    Serial.println(F("Leggo i valori dalla scorsa sessione di calibrazione"));
     sensorSettings->begin("myPrefs", false);
     bool doesExist = sensorSettings->isKey("calDataReady");
     if (doesExist)
@@ -84,8 +96,8 @@ void CalibrationManager::importCalibrationData()
         gyroY_offest = sensorSettings->getInt("gyro_y_offset");
         gyroZ_offest = sensorSettings->getInt("gryo_z_offset");
         isAlreadyCalibrated = true;
-        Serial.println(F("Calibration data imported correctly"));
-        Serial.print("Your offsets:\t");
+        Serial.println(F("Valori di offset letti correttamente"));
+        Serial.print("Offset:\t");
         Serial.print(accX_offest);
         Serial.print("\t");
         Serial.print(accY_offest);
@@ -100,7 +112,7 @@ void CalibrationManager::importCalibrationData()
     }
     else
     {
-        Serial.println(F("No calibration data avaiable. Reccomended run a new calibration session"));
+        Serial.println(F("Nessun valore di calibrazione trovato"));
         accX_offest = 0;
         accY_offest = 0;
         accZ_offest = 0;
@@ -112,10 +124,10 @@ void CalibrationManager::importCalibrationData()
     int calibrationCode = needCalibration();
     if (calibrationCode)
     {
-        Serial.print(F("Sensor calibration started cause: "));
-        Serial.println(calibrationCode == 1 ? F("from GPIO high") : F("no aother calibration has been founded first calibration"));
+        Serial.print(F("Inizio calibrazione. Causa: "));
+        Serial.println(calibrationCode == 1 ? F("pin GPIO alto") : F("Nessuna precedente calibrazione trovata"));
         startCalibration();
-        Serial.println(F("Sensor calibration ended.\nRestarting device"));
+        Serial.println(F("Calibrazione terminaat.\nRiavvio dispositivo"));
         delay(2000);
         esp_restart();
         return;
@@ -124,6 +136,11 @@ void CalibrationManager::importCalibrationData()
     setCalibration();
 }
 
+/**
+ * @brief Imposta i valori di offset ottenuti durante la calibrazione
+ * o letti da memoria da una calibrazione precedente
+ *
+ */
 void CalibrationManager::setCalibration()
 {
     this->accelgyro->setXAccelOffset(this->accX_offest);
@@ -134,6 +151,11 @@ void CalibrationManager::setCalibration()
     this->accelgyro->setZGyroOffset(this->gyroZ_offest);
 }
 
+/**
+ * @brief Effettua una serie di letture e dai sensori e calcola la loro media.
+ * Questo sarà utile per calcolare l'errore di offset
+ *
+ */
 void CalibrationManager::meansensors()
 {
     long i = 0, buff_ax = 0, buff_ay = 0, buff_az = 0, buff_gx = 0, buff_gy = 0, buff_gz = 0;
@@ -166,6 +188,11 @@ void CalibrationManager::meansensors()
     }
 }
 
+/**
+ * @brief Effettua un modfiica più mirata ai valori di offset usando i
+ * valori otttenuti da `meansensors()`
+ *
+ */
 void CalibrationManager::calibration()
 {
     ax_offset = -mean_ax / 8;
@@ -223,7 +250,11 @@ void CalibrationManager::calibration()
             break;
     }
 }
-
+/**
+ * @brief Controlla se è necessario effettuare la calibrazione
+ *
+ * @return int 0 se la calibrazione non è necessaria ne richiesta. 1 se è richiesta. 2 se è necessaria
+ */
 int CalibrationManager::needCalibration()
 {
     if (digitalRead(25))

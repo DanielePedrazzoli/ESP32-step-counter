@@ -11,14 +11,6 @@ SensorData::~SensorData() {}
  */
 void SensorData::init()
 {
-    // kalmanFilter = new SimpleKalmanFilter(500, 1000, 0.01);
-
-    // int i;
-    // for (i = 0; i < SAMPLEFILTER_TAP_NUM; ++i)
-    // {
-    //     filterStruct.history[i] = 0;
-    // }
-    // filterStruct.last_index = 0;
     SampleFilter_init(&filterStruct);
 }
 
@@ -38,16 +30,27 @@ bool SensorData::addValue(VectorInt16 *v)
         last_value_index = 0;
     }
 
-    // return false;
-
     return computevalue();
 }
 
+/**
+ * @brief Ritorna l'ultimo valore salvato nel buffer circolare
+ *
+ * @return float
+ */
 float SensorData::getLastAvaiableData()
 {
     return values[last_value_index];
 }
 
+/**
+ * @brief Esegue un controllo per verifica se lo step è vero oppure no.
+ * Controlla se gli step rilevati sono almento ad un tot di sample l'uno dall'altro.
+ * Questo dovrebbe permettere di evitare di contare dei falsi step dovuti a delle oscillazioni
+ *
+ * @return true se lo step è considerato valido.
+ * @return false se lo step non è valido
+ */
 bool SensorData::computevalue()
 {
     int secondToLast;
@@ -62,7 +65,7 @@ bool SensorData::computevalue()
         // controllo se sono stato al di sotto della threshold per un quantitativo
         // di tempo ragionevole
         // Questo permette di eliminare alcuni falsi passi che verrebbero rilevati
-        if (samplesFomrLastStep >= 70)
+        if (samplesFomrLastStep >= 35)
         {
             samplesFomrLastStep = 0;
             return true;
@@ -72,7 +75,7 @@ bool SensorData::computevalue()
 
     if (alreadyOverTreshold && current < threshold)
     {
-        samplesFomrLastStep = 0;
+        // samplesFomrLastStep = 0;
         alreadyOverTreshold = false;
     }
 

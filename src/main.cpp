@@ -3,10 +3,7 @@
 #include "I2Cdev.h"
 #include <MPU6050_6Axis_MotionApps612.h>
 #include "Wire.h"
-
 #include "BLEManager.h"
-
-#include "Costants.h"
 #include <driver/i2c.h>
 #include "Calibration/CalibrationManager.h"
 #include "MotionSensor.h"
@@ -27,8 +24,6 @@ MotionSensor motionSensor;
 #define OUTPUT_READABLE_YAWPITCHROLL
 #define I2C_FREQUENCY 400000
 
-#define CALIBRATION_ON false
-
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
@@ -39,79 +34,94 @@ uint8_t fifoBuffer[64]; // FIFO storage buffer
 // orientation/motion vars
 VectorFloat gravity; // [x, y, z]            gravity vector
 Quaternion q;        // [w, x, y, z]         quaternion container
-float ypr[3];        // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
 volatile bool mpuInterrupt = false;
+
+/**
+ * @brief Funzione di interrupt richiamata ogni volta che MPU6050 effettua un campionamento
+ *
+ */
 void dmpDataReady()
 {
   mpuInterrupt = true;
 }
 
-void setup()
+/**
+ * @brief Funzione di inizializzazione di tutte le seriali usate
+ *
+ */
+void initSerial()
 {
-  pinMode(25, INPUT_PULLDOWN);
   Wire.begin(I2C_MASTER_SDA_IO, I2C_MASTER_SCL_IO, I2C_FREQUENCY);
-
   Serial.begin(115200);
   while (!Serial)
     ;
+}
 
+/**
+ * @brief Inizializzaione sensore e DMP del sensore
+ *
+ * @return int codice di errore.
+ * - 0 nesusn errore
+ * - 1 initial memory load failed
+ * - 2 DMP configuration updates failed
+ */
+int initSensor()
+{
   // initialize device
-  Serial.println(F("Initializing I2C devices..."));
+  Serial.println(F("Inizializazione sensore in corso..."));
   mpu.initialize();
 
-  // verify connection
-  Serial.println(F("Testing device connections..."));
-  Serial.println(F("MPU6050 connection "));
-  Serial.print(mpu.testConnection() ? F("successful") : F("failed"));
+  // Verifica della connessione
+  Serial.println(F("Connessione a MPU6050 "));
+  Serial.print(mpu.testConnection() ? F("avvenuta") : F("fallita"));
 
   // load and configure the DMP
-  Serial.println(F("Initializing DMP..."));
+  Serial.println(F("Inizializzazione DMP..."));
   devStatus = mpu.dmpInitialize();
   mpu.setIntDataReadyEnabled(true);
-  Serial.println(F("Enabling interrupt detection"));
+  Serial.println(F("Abilitazione interrupt"));
   attachInterrupt(INTERRUPT_Sensor, dmpDataReady, RISING);
-  accelerometerData.init();
 
-  // make sure it worked (returns 0 if so)
   if (devStatus == 0)
   {
-    // turn on the DMP, now that it's ready
-    Serial.println(F("Enabling DMP..."));
+    Serial.println(F("Abilitazione DMP..."));
     mpu.setDMPEnabled(true);
 
     mpuIntStatus = mpu.getIntStatus();
 
-    // set our DMP Ready flag so the main loop() function knows it's okay to use it
-    Serial.println(F("DMP ready"));
-    dmpReady = true;
-
-    // get expected DMP packet size for later comparison
+    Serial.println(F("DMP pronto"));
     packetSize = mpu.dmpGetFIFOPacketSize();
+
+    return 0;
   }
   else
   {
-    // ERROR!
-    // 1 = initial memory load failed
-    // 2 = DMP configuration updates failed
-    // (if it's going to break, usually the code will be 1)
-    Serial.print(F("DMP Initialization failed (code "));
+    Serial.print(F("Inizializzaione DMP fallita (code "));
     Serial.print(devStatus);
     Serial.println(F(")"));
+    return devStatus;
   }
+}
 
+/**
+ * @brief Main setup
+ *
+ */
+void setup()
+{
+  // Abilitazione del pin dell'autocalibrazione
+  pinMode(25, INPUT_PULLDOWN);
+
+  initSerial();
+  dmpReady = !initSensor();
+
+  accelerometerData.init();
   calManager.importCalibrationData();
 
-  // I2Cdev::writeByte(0x68, 0x6B, 0b00000001); // Internal Clock set to Gyro output
-  // I2Cdev::writeByte(0x68, 0x6A, 0b00000100); // Reset FIFO
   I2Cdev::writeByte(0x68, 0x19, 39);         // 200, Sample frequency = 8000 / (1 + n)
   I2Cdev::writeByte(0x68, 0x1A, 0b00000000); // DLPF
-  // I2Cdev::writeByte(0x68, 0x23, 0b01111000); // Load Accelerometer (3° bit) & gyro (6° = x, 5° = y, 4° = z bit) to FIFO
-  // I2Cdev::writeByte(0x68, 0x38, 0b00000001); // Data ready Interrupt
-  // I2Cdev::writeByte(0x68, 0x6A, 0b01000100); // Enable FIFO
-  // mpu.setFullScaleAccelRange(0x00); // Accelerometer sensitivity (1g)
   mpu.resetFIFO();
-  // mpu.setDLPFMode();
 
   bleManager.init();
   motionSensor.init(&bleManager);
@@ -137,6 +147,10 @@ void printVector(VectorInt16 v)
   Serial.println("");
 }
 
+/**
+ * @brief main loop
+ *
+ */
 void loop()
 {
 
@@ -185,7 +199,7 @@ void loop()
   if (stepAdded)
   {
     motionSensor.addStep();
-    Serial.print("step added. Total: ");
+    Serial.print("Passo rilevato. Totale: ");
     Serial.println(motionSensor.step);
   }
 

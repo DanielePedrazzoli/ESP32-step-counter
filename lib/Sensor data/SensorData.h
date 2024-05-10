@@ -3,7 +3,6 @@
 
 #include <MPU6050_6Axis_MotionApps612.h>
 #include <Arduino.h>
-#include "Costants.h"
 #include "SampleFilter.h"
 #include "esp_dsp.h"
 #include "SampleFilter.h"
@@ -26,15 +25,9 @@ public:
 private:
     bool computevalue();
 
-    // SimpleKalmanFilter *kalmanFilter;
-
     SampleFilter filterStruct;
-
-    bool isAscending = false;
     bool alreadyOverTreshold = false;
-
-    int threshold = 6553;
-    unsigned long lastUnderThreshold;
+    int threshold = 6553; // approssimativamente 0.475 g
     int samplesFomrLastStep = 0;
 };
 

@@ -1,13 +1,19 @@
 #include "MotionSensor.h"
-// #ifndef _BLE_MANAGER_
-// #include "BLEManager.h"
-// #endif
-// extern BLE_Manager bleManager;
+
+/**
+ * @brief Funzione di inizializzazione
+ *
+ * @param m puntatore al Manager BLE per la comunicazione BLE
+ */
 void MotionSensor::init(BLE_Manager *m)
 {
     manager = m;
 }
 
+/**
+ * @brief Costruttore della classe
+ *
+ */
 MotionSensor::MotionSensor()
 {
     for (int i = 0; i < STEP_HISTORY_NUMBER; i++)
@@ -16,6 +22,11 @@ MotionSensor::MotionSensor()
     }
 }
 
+/**
+ * @brief incrementa il numero degli step salavti e aggiorna lo stato di movimento.
+ * Notifica anche alla libreria BLE che il valore è stato modificato
+ *
+ */
 void MotionSensor::addStep()
 {
     step++;
@@ -25,28 +36,66 @@ void MotionSensor::addStep()
     manager->changeMotionState(currentMotionState);
 }
 
+/**
+ * @brief Aggiorna gli ultimi valori in modo da osservare quando tempo
+ * è passato tra uno step rilevato ed un altro. Questo permette di ottenere
+ * lo stato di movimento
+ *
+ */
 void MotionSensor::updateHistory()
 {
     step_history[history_index++] = millis();
+
+    // buffer circolare
     if (history_index >= STEP_HISTORY_NUMBER)
     {
         history_index = 0;
     }
 
-    long sum = 0;
-    for (int i = 0; i < STEP_HISTORY_NUMBER; i++)
+    // supponendo di avere 5 valori x1,x2,x3,x4,x5.
+    // Effettuare la media tra la differenza di questi valori equivale a
+    // calcolare (x5 - x1) / 5
+    // Naturalmente questo va applicto al concetto di buffer circolare
+    uint8_t mostRecentValueIndex;
+    uint8_t lastRencetValueIndex;
+
+    if (history_index == 0)
     {
-        sum += step_history[i];
+        // Se l'indice attuale è nullo, il valore più recente aggiunto si trova
+        // quindi come ultima posizione dell'array
+        // Allo stesso tempo significa che il valore più vecchio si trova all'indice 0
+        mostRecentValueIndex = step_history[STEP_HISTORY_NUMBER - 1];
+        lastRencetValueIndex = step_history[0];
+    }
+    else
+    {
+        // Se l'indice attuale è diverso da zero, il valore più recente aggiunto si trova sempre
+        // all'indice precdente del puntatore attuale. Questo poiché ogni volta che aggiunge un
+        // valore incremento il contatore. Di conseguenza l'ultimo valore si trova sempre
+        // all'indice del puntatore attuale
+        mostRecentValueIndex = step_history[history_index - 1];
+        lastRencetValueIndex = step_history[history_index];
     }
 
-    long period = sum / STEP_HISTORY_NUMBER;
+    long diff = (mostRecentValueIndex - lastRencetValueIndex) / STEP_HISTORY_NUMBER;
 
-    if (period != 0)
-    {
-        step_freq = 1 / period;
-    }
+    // Se la differenza è nulla o inferiore a 0 allora la ignoro.
+    // Probabilmente sono in una fase iniziale e i valori devono
+    // ancora essere riempiti
+    if (diff == 0 || diff < 0)
+        return;
+
+    // Se considero la differenza appena ottenuta come periodo del passo allora posso calcolare
+    // la sua frequenza effettuando il suo inverso
+
+    step_freq = 1 / diff;
 }
 
+/**
+ * @brief Aggiorna lo stato attuale di movimento in base a delle soglie
+ * di frequenza di passi prefissate
+ *
+ */
 void MotionSensor::updateState()
 {
     if (step_freq < SLOW_WALKING_TH)

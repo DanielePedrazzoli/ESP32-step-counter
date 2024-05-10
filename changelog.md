@@ -1,3 +1,6 @@
+## Versione 0.5.1
+- Aggiunta la documentazione alle funzioni e ai metodi
+
 ## Versione 0.5.0
 - Eliminato l'uso del filtro kalman e rispistinato l'uso di un FIR passa basso
 - Aggiunto il conteggio dei passi in base alle soglie
