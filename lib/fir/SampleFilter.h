@@ -20,9 +20,8 @@ sampling frequency: 200 Hz
 
 */
 
-#define SAMPLEFILTER_TAP_NUM 31
-
-typedef struct
+#define SAMPLEFILTER_TAP_NUM 51
+ typedef struct
 {
   double history[SAMPLEFILTER_TAP_NUM];
   unsigned int last_index;

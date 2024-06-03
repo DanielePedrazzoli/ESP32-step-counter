@@ -7,38 +7,29 @@
 
 #define STEP_HISTORY_NUMBER 5
 
-#define SLOW_WALKING_TH 1
-#define WALKING_TH 2
-#define FAST_WALKING_TH 3
-#define RUNNING_TH 4
-
-enum motionStates
-{
-    STANDING = 0,
-    SLOW_WALKING = 1,
-    WALKING = 2,
-    FAST_WALKING = 3,
-    RUNNING = 4,
-};
+#define AVG_SLOW_WALK_SPEED 1.25f // m/s --> 4 km/h
+#define AVG_WALK_SPEED 1.38f      // m/s --> 5 km/h
+#define AVG_RUN_SPEED 1.66f       // m/s --> 7 km/h
 
 class MotionSensor
 {
 private:
-    void updateHistory();
-    void updateState();
-
-    unsigned long step_history[STEP_HISTORY_NUMBER];
     float step_freq;
     uint8_t history_index;
     BLE_Manager *manager;
 
+    Step stepHistory[STEP_HISTORY_NUMBER];
+    char stepHistoryIndex = 0;
+    double distanceTravelled = 0;
+
 public:
     MotionSensor();
     void init(BLE_Manager *);
-    void addStep();
+    void addStep(Step *);
+
+    void sampleStep(SensorData *);
 
     int step;
-    motionStates currentMotionState = motionStates::STANDING;
 };
 
 #endif

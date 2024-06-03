@@ -1,4 +1,5 @@
 
+#include "debug.h"
 #include <Arduino.h>
 #include "I2Cdev.h"
 #include <MPU6050_6Axis_MotionApps612.h>
@@ -7,6 +8,11 @@
 #include <driver/i2c.h>
 #include "Calibration/CalibrationManager.h"
 #include "MotionSensor.h"
+
+uint8_t dmpGetQuaternion(Quaternion *q, const uint8_t *packet);
+uint8_t dmpGetGravity(VectorFloat *v, Quaternion *q);
+uint8_t dmpGetAccel(VectorInt16 *v, const uint8_t *packet);
+uint8_t dmpGetLinearAccel(VectorInt16 *v, VectorInt16 *vRaw, VectorFloat *gravity);
 
 Preferences preferences;
 MPU6050 mpu(0x68);
@@ -32,18 +38,27 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 
 // orientation/motion vars
-VectorFloat gravity; // [x, y, z]            gravity vector
-Quaternion q;        // [w, x, y, z]         quaternion container
 
-volatile bool mpuInterrupt = false;
+volatile uint8_t packetCount = 0;
+uint8_t precPacketCount = 0;
+uint8_t packetCountLimit = 0;
+
+hw_timer_t *StepAnalisyTimer = NULL;
+bool analizeSteps = false;
+
+void IRAM_ATTR onTimer()
+{
+  analizeSteps = true;
+}
 
 /**
  * @brief Funzione di interrupt richiamata ogni volta che MPU6050 effettua un campionamento
  *
  */
-void dmpDataReady()
+void IRAM_ATTR dmpDataReady()
 {
-  mpuInterrupt = true;
+
+  packetCount++;
 }
 
 /**
@@ -92,6 +107,19 @@ int initSensor()
 
     Serial.println(F("DMP pronto"));
     packetSize = mpu.dmpGetFIFOPacketSize();
+    Serial.print(F("packetSize: "));
+    Serial.println(packetSize);
+
+    // determino il numero massimo di valori che possono essere salvati nella FIFO
+    // in base alla loro dimensione
+    // La dimensione della FIFO è 1024 byte e per sicurezza è meglio avere dei
+    // pacchetti di scarto, quindi la quantità massima è
+    int padding = 2;
+    packetCountLimit = 1; //(int)(1024 / packetSize - padding);
+#ifdef DEBUG
+    Serial.print(F("count limit: "));
+    Serial.println(packetCountLimit);
+#endif
 
     return 0;
   }
@@ -111,40 +139,87 @@ int initSensor()
 void setup()
 {
   // Abilitazione del pin dell'autocalibrazione
-  pinMode(25, INPUT_PULLDOWN);
+  pinMode(15, INPUT_PULLUP);
 
   initSerial();
   dmpReady = !initSensor();
 
   accelerometerData.init();
+  mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+
   calManager.importCalibrationData();
 
-  I2Cdev::writeByte(0x68, 0x19, 39);         // 200, Sample frequency = 8000 / (1 + n)
-  I2Cdev::writeByte(0x68, 0x1A, 0b00000000); // DLPF
+  I2Cdev::writeByte(0x68, 0x19, 39);         // 200, Sample frequency = 8000 / (1 + n) 39
+  I2Cdev::writeByte(0x68, 0x1A, 0b00000000); // DLPF disabilitato
   mpu.resetFIFO();
 
   bleManager.init();
   motionSensor.init(&bleManager);
+
+  // timer 0 con un divisore di 80 e conteggio crescente (0,1,2,3,4,...)
+  StepAnalisyTimer = timerBegin(0, 80, true);
+  timerAttachInterrupt(StepAnalisyTimer, &onTimer, true);
+
+  // Clock ESP32 = 80MHz --> divder a 80 --> 1Mhz = 1μs ---> 2000000 = 2s
+  timerAlarmWrite(StepAnalisyTimer, 2000000, true);
+  timerAlarmEnable(StepAnalisyTimer);
 }
 
-void printVector(VectorFloat v)
+/**
+ * @brief Lettura dei valori dal sensore
+ */
+void readData()
 {
-  Serial.print(v.x);
-  Serial.print("\t");
-  Serial.print(v.y);
-  Serial.print("\t");
-  Serial.print(v.z);
-  Serial.println("");
-}
 
-void printVector(VectorInt16 v)
-{
-  Serial.print(v.x);
-  Serial.print("\t");
-  Serial.print(v.y);
-  Serial.print("\t");
-  Serial.print(v.z);
-  Serial.println("");
+  mpuIntStatus = mpu.getIntStatus();
+  if ((mpuIntStatus & 0x10))
+  {
+    mpu.resetFIFO();
+    Serial.println(F("FIFO overflow!"));
+    return;
+  }
+
+  if (!(mpuIntStatus & 0x02))
+  {
+    return;
+  }
+
+  int fifoCount = 0;
+  while (fifoCount < packetSize * packetCountLimit)
+    fifoCount = mpu.getFIFOCount();
+
+  // Serial.print("Reading data\nTotal FIFO count: ");
+  // Serial.println(fifoCount);
+
+  // Per ogni pacchetto avvito la seqeunza di parsing e salvo i valori
+  for (int i = 0; i < packetCountLimit; i++)
+  {
+    // Essendo già il  buffer una FIFO non è necessario tenere conto di quale pacchetto
+    // sto andando a leggere. Il pacchetto sarà sempre disponibile come primo
+    mpu.getFIFOBytes(fifoBuffer, packetSize);
+
+    VectorInt16 accVector;
+    VectorInt16 accRawVector;
+    VectorFloat gravity;
+    Quaternion q;
+
+    dmpGetQuaternion(&q, fifoBuffer);
+    dmpGetGravity(&gravity, &q);
+    dmpGetAccel(&accRawVector, fifoBuffer);
+    dmpGetLinearAccel(&accVector, &accRawVector, &gravity);
+
+    bool stepAdded = accelerometerData.pushValue(&accVector);
+    if (stepAdded)
+    {
+      motionSensor.addStep(&accelerometerData.mosteRecentStep);
+      Serial.print("Passo rilevato. Totale: ");
+      Serial.println(motionSensor.step);
+    }
+
+#if DEBUG_MODE
+    bleManager.changeValue_Accelerometer_value(&accelerometerData);
+#endif
+  }
 }
 
 /**
@@ -159,49 +234,100 @@ void loop()
     return;
   }
 
-  if (!mpuInterrupt)
+  if (analizeSteps)
   {
-    return;
+    analizeSteps = false;
+    motionSensor.sampleStep(&accelerometerData);
   }
 
-  mpuInterrupt = false;
-  mpuIntStatus = mpu.getIntStatus();
+  // if (precPacketCount != packetCount)
+  // {
+  //   Serial.println(packetCount);
+  //   precPacketCount = packetCount;
+  // }
 
-  if ((mpuIntStatus & 0x10))
+  if (packetCount >= packetCountLimit)
   {
-    mpu.resetFIFO();
-    Serial.println(F("FIFO overflow!"));
-    return;
+    readData();
+    packetCount = 0;
   }
+}
 
-  if (!(mpuIntStatus & 0x02))
-  {
-    return;
-  }
+/**************************************************************************************************************************/
+/**************************************************************************************************************************/
+/**************************************************************************************************************************/
 
-  // wait for correct available data length, should be a VERY short wait
-  int fifoCount = 0;
-  while (fifoCount < packetSize)
-    fifoCount = mpu.getFIFOCount();
+/**
+ * @brief Estrae i quaternione dal pacchetto inviato dal DMP e lo compone
+ *
+ * @param q
+ * @param packet
+ * @return uint8_t
+ */
+uint8_t dmpGetQuaternion(Quaternion *quaternion, const uint8_t *packet)
+{
+  int16_t qI[4];
+  qI[0] = ((packet[0] << 8) | packet[1]);
+  qI[1] = ((packet[4] << 8) | packet[5]);
+  qI[2] = ((packet[8] << 8) | packet[9]);
+  qI[3] = ((packet[12] << 8) | packet[13]);
 
-  mpu.getFIFOBytes(fifoBuffer, packetSize);
+  quaternion->w = (float)qI[0] / (16384.0f);
+  quaternion->x = (float)qI[1] / (16384.0f);
+  quaternion->y = (float)qI[2] / (16384.0f);
+  quaternion->z = (float)qI[3] / (16384.0f);
 
-  VectorInt16 accVector;
-  VectorInt16 accRawVector;
+  return 0;
+}
 
-  mpu.dmpGetQuaternion(&q, fifoBuffer);
-  mpu.dmpGetGravity(&gravity, &q);
-  mpu.dmpGetAccel(&accRawVector, fifoBuffer);
+/**
+ * @brief Applica la moltiplicazione di quaternioni per eliminare la componente gravitazionale dalle accellerazioni ottenute
+ *
+ * @param v
+ * @param q
+ * @return uint8_t
+ */
+uint8_t dmpGetGravity(VectorFloat *resultVector, Quaternion *quaternion)
+{
+  float qx = quaternion->x;
+  float qy = quaternion->y;
+  float qz = quaternion->z;
+  float qw = quaternion->w;
 
-  mpu.dmpGetLinearAccel(&accVector, &accRawVector, &gravity);
+  resultVector->x = 2 * (qx * qz - qw * qy);
+  resultVector->y = 2 * (qw * qx + qy * qz);
+  resultVector->z = qw * qw - qx * qx - qy * qy + qz * qz;
+  return 0;
+}
 
-  bool stepAdded = accelerometerData.addValue(&accVector);
-  if (stepAdded)
-  {
-    motionSensor.addStep();
-    Serial.print("Passo rilevato. Totale: ");
-    Serial.println(motionSensor.step);
-  }
+/**
+ * @brief Estrae i valori di accelerazione dal pacchetto inviato dal DMP
+ *
+ * @param v
+ * @param packet
+ * @return uint8_t
+ */
+uint8_t dmpGetAccel(VectorInt16 *resultVector, const uint8_t *packet)
+{
+  resultVector->x = (packet[16] << 8) | packet[17];
+  resultVector->y = (packet[18] << 8) | packet[19];
+  resultVector->z = (packet[20] << 8) | packet[21];
+  return 0;
+}
 
-  bleManager.changeValue_Accelerometer_value(&accelerometerData);
+/**
+ * @brief Elimina la componente gravitazionale [gravity] dal vettore di partenza [vRaw]
+ *
+ * @param v
+ * @param vRaw
+ * @param gravity
+ * @return uint8_t
+ */
+uint8_t dmpGetLinearAccel(VectorInt16 *linearAcceleration, VectorInt16 *rawAcceleration, VectorFloat *gravity)
+{
+  // get rid of the gravity component (+1g = +16384 in standard DMP FIFO packet, sensitivity is 2g)
+  linearAcceleration->x = rawAcceleration->x - gravity->x * (16384);
+  linearAcceleration->y = rawAcceleration->y - gravity->y * (16384);
+  linearAcceleration->z = rawAcceleration->z - gravity->z * (16384);
+  return 0;
 }

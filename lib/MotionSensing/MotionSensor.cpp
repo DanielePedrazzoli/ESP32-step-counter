@@ -8,6 +8,11 @@
 void MotionSensor::init(BLE_Manager *m)
 {
     manager = m;
+
+    for (int i = 0; i < STEP_HISTORY_NUMBER; i++)
+    {
+        stepHistory[i] = {0, 0, 0, MotionState::unknow};
+    }
 }
 
 /**
@@ -16,10 +21,6 @@ void MotionSensor::init(BLE_Manager *m)
  */
 MotionSensor::MotionSensor()
 {
-    for (int i = 0; i < STEP_HISTORY_NUMBER; i++)
-    {
-        step_history[i] = 0;
-    }
 }
 
 /**
@@ -27,100 +28,74 @@ MotionSensor::MotionSensor()
  * Notifica anche alla libreria BLE che il valore è stato modificato
  *
  */
-void MotionSensor::addStep()
+void MotionSensor::addStep(Step *lastAddedStep)
 {
     step++;
-    updateHistory();
-    updateState();
     manager->changeStepValue(step);
-    manager->changeMotionState(currentMotionState);
+
+    // Provo a stimare una distanza percorsa in base alla durata del passo e all'accelerazione
+    // ottenuta
+    // Data la durata del passo la stima avviene dividendo per la frequenza di campionamento
+    // e moltiplicando per la velocità media percorribile dato quello stato di movimento
+    double stepLenght = lastAddedStep->end - lastAddedStep->start;
+    switch (lastAddedStep->stepType)
+    {
+    case MotionState::slowWalk:
+        distanceTravelled += (double)(stepLenght / 100) * AVG_SLOW_WALK_SPEED;
+        break;
+
+    case MotionState::walk:
+        distanceTravelled += (double)(stepLenght / 100) * AVG_WALK_SPEED;
+        break;
+
+    case MotionState::run:
+        distanceTravelled += (double)(stepLenght / 100) * AVG_RUN_SPEED;
+        break;
+
+    default:
+        break;
+    }
+    Serial.print("step lenght: ");
+    Serial.print(stepLenght);
+    Serial.print("\t");
+    Serial.print("current distance: ");
+    Serial.print(distanceTravelled);
+    Serial.print("\t");
 }
 
 /**
- * @brief Aggiorna gli ultimi valori in modo da osservare quando tempo
- * è passato tra uno step rilevato ed un altro. Questo permette di ottenere
- * lo stato di movimento
+ * @brief Estra l'ultimo step rilevato e lo prede in considerazione per il rilevamento dello stato di movimento
  *
+ * @param sensor
  */
-void MotionSensor::updateHistory()
+void MotionSensor::sampleStep(SensorData *sensor)
 {
-    step_history[history_index++] = millis();
-
-    // buffer circolare
-    if (history_index >= STEP_HISTORY_NUMBER)
+    stepHistory[history_index] = sensor->mosteRecentStep;
+    // Calcolo la media della distanza dei passi (quindi dei picchi dei passi)
+    // Questo mi permette di calcolare a quanti passi al secondi sto andando
+    double sum = 0;
+    int motionStateIndex = 0;
+    for (int i = 0; i < STEP_HISTORY_NUMBER - 1; i++)
     {
-        history_index = 0;
+        int currentPeek = stepHistory[(history_index - i + STEP_HISTORY_NUMBER) % STEP_HISTORY_NUMBER].peek;
+        int prevPeek = stepHistory[(history_index - i - 1 + STEP_HISTORY_NUMBER) % STEP_HISTORY_NUMBER].peek;
+        sum += currentPeek - prevPeek;
     }
 
-    // supponendo di avere 5 valori x1,x2,x3,x4,x5.
-    // Effettuare la media tra la differenza di questi valori equivale a
-    // calcolare (x5 - x1) / 5
-    // Naturalmente questo va applicto al concetto di buffer circolare
-    uint8_t mostRecentValueIndex;
-    uint8_t lastRencetValueIndex;
+    // questo valore rappresenta la media della distanza tra gli ultimi 5 picchi (quindi 5 step)
+    float avgPeekDistance = (float)(sum / (STEP_HISTORY_NUMBER - 1));
 
-    if (history_index == 0)
-    {
-        // Se l'indice attuale è nullo, il valore più recente aggiunto si trova
-        // quindi come ultima posizione dell'array
-        // Allo stesso tempo significa che il valore più vecchio si trova all'indice 0
-        mostRecentValueIndex = step_history[STEP_HISTORY_NUMBER - 1];
-        lastRencetValueIndex = step_history[0];
-    }
-    else
-    {
-        // Se l'indice attuale è diverso da zero, il valore più recente aggiunto si trova sempre
-        // all'indice precdente del puntatore attuale. Questo poiché ogni volta che aggiunge un
-        // valore incremento il contatore. Di conseguenza l'ultimo valore si trova sempre
-        // all'indice del puntatore attuale
-        mostRecentValueIndex = step_history[history_index - 1];
-        lastRencetValueIndex = step_history[history_index];
-    }
+    // Di conseguenza, sapendo la frequenza di campionamto (200Hz) posso so che
+    // effettuare un passo di metto mediamente:
+    //
+    // avgPeekDistance [campioni]
+    // ------------------------- = v [passi al secondo]
+    /// 200 [campioni/secondo]
 
-    long diff = (mostRecentValueIndex - lastRencetValueIndex) / STEP_HISTORY_NUMBER;
+    step_freq = avgPeekDistance / 200;
 
-    // Se la differenza è nulla o inferiore a 0 allora la ignoro.
-    // Probabilmente sono in una fase iniziale e i valori devono
-    // ancora essere riempiti
-    if (diff == 0 || diff < 0)
-        return;
-
-    // Se considero la differenza appena ottenuta come periodo del passo allora posso calcolare
-    // la sua frequenza effettuando il suo inverso
-
-    step_freq = 1 / diff;
-}
-
-/**
- * @brief Aggiorna lo stato attuale di movimento in base a delle soglie
- * di frequenza di passi prefissate
- *
- */
-void MotionSensor::updateState()
-{
-    if (step_freq < SLOW_WALKING_TH)
-    {
-        currentMotionState = motionStates::STANDING;
-        return;
-    }
-
-    if (step_freq < WALKING_TH)
-    {
-        currentMotionState = motionStates::SLOW_WALKING;
-        return;
-    }
-
-    if (step_freq < FAST_WALKING_TH)
-    {
-        currentMotionState = motionStates::WALKING;
-        return;
-    }
-
-    if (step_freq < RUNNING_TH)
-    {
-        currentMotionState = motionStates::FAST_WALKING;
-        return;
-    }
-
-    currentMotionState = motionStates::RUNNING;
+    Serial.print("current freq: ");
+    Serial.println(step_freq);
+    manager->updateAnalisysData(step_freq, distanceTravelled);
+    history_index = (history_index + 1) % STEP_HISTORY_NUMBER;
 }

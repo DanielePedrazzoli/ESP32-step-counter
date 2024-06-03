@@ -1,3 +1,8 @@
+## Versione 1.0.1
+- Impelementato il nuovo algoritmo di rilevamento dei passi
+- Agigunte le librerie al progetto
+- Aggiornato il filtro FIR
+
 ## Versione 0.5.2
 - Bugfix
 
